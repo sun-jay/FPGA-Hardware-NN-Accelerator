@@ -80,7 +80,6 @@ module NN(
         .reset(~mm1_finished  || mm2_finished_delay),
         
         .addr_outA(addrC),
-//        .data_inA(32'b00000000100000000000000000000000),
         .data_inA(dataC_relu),
 
         .addr_outB(addr_busD),

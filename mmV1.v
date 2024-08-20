@@ -215,9 +215,6 @@ module MM_Unit #(
                     .numInSide(chainModInWireA[i][j]),
                     .numOutSide(chainModInWireA[i][j+1]),
                     
-//                    .numInTop(chainModInWireA[i][j]),
-//                    .numOutTop(chainModInWireA[i][j+1]),
-                    
                     .numInTop(chainModInWireB[i][j]),
                     .numOutTop(chainModInWireB[i+1][j]),
                     

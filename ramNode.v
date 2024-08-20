@@ -1,4 +1,4 @@
-module customROM #(
+module ramNode #(
     parameter WIDTH = 8,
     parameter DEPTH = 16,
     parameter DEPTH_LOG = $clog2(DEPTH),

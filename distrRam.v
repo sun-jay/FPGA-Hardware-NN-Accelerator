@@ -30,7 +30,7 @@ module DistRAM #(
             
             
             
-            customROM #(
+            ramNode #(
                 .WIDTH(WIDTH),
                 .DEPTH(DEPTH),
                 .MEM_FILE(filename)
