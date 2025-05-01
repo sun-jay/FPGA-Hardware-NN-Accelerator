@@ -59,3 +59,157 @@ always @(posedge clk or posedge reset) begin
         sum        <= sum + (product >>> frac_bits); // fixed-point adjustment
     end
 end
+```
+
+### Matrix-Multiply (MM) Module
+
+The MM module instantiates a 2D fabric of MACs, chaining outputs horizontally and vertically:
+
+```verilog
+// Module MM
+
+// wires for chaining data
+wire [bit_res-1:0] chainModInWireA [0:rowsOut-1][0:colsOut];
+wire [bit_res-1:0] chainModInWireB [0:rowsOut][0:colsOut-1];
+wire [bit_res-1:0] sum_outputs     [0:rowsOut*colsOut-1];
+
+genvar i, j;
+generate
+    for (i = 0; i < rowsOut; i = i + 1) begin : chains
+        for (j = 0; j < colsOut; j = j + 1) begin : mods
+            chainMod u_chainMod (
+                .clk(clk),
+                .reset(reset),
+                .numInSide(chainModInWireA[i][j]),
+                .numOutSide(chainModInWireA[i][j+1]),
+                .numInTop(chainModInWireB[i][j]),
+                .numOutTop(chainModInWireB[i+1][j]),
+                .sum(sum_outputs[i*colsOut + j])
+            );
+        end
+    end
+endgenerate
+```
+
+---
+
+## Storing and Bussing Weights
+
+Memory bandwidth is a major constraint. To feed the systolic array, I implemented a multi-node RAM that loads **110 weights per clock cycle**.
+
+```verilog
+// Module ramNode
+reg [WIDTH-1:0] rom [0:DEPTH-1];
+
+initial begin
+    $readmemb(MEM_FILE, rom, 0, DEPTH-1);
+end
+
+always @(posedge clk) begin
+    if (addr_rd < DEPTH) data_out <= rom[addr_rd];
+    else                data_out <= 0;
+end
+```
+
+The `distRam` module instantiates multiple `ramNode`s to expose many read ports concurrently.
+
+---
+
+## Assembling the Network
+
+The full network chains two MM stages:
+
+1. **MM1** multiplies inputs with **Weights1**.  
+2. **MM2** multiplies MM1’s outputs with **Weights2**.
+
+No biases were used (negligible accuracy impact). The dual-MM pipeline embodies the intelligence of the network.
+
+---
+
+## ArgMax Circuit
+
+To extract the predicted digit (0–9), an ArgMax runs in combinational logic on `< 1` cycle:
+
+```verilog
+integer i;
+reg signed [31:0] max_value;
+
+always @(posedge mm2_finished) begin
+    max_value = $signed(mm2.sum_outputs[0]);
+    digit_out = 0;
+
+    for (i = 1; i < 10; i = i + 1) begin
+        if ($signed(mm2.sum_outputs[i]) > max_value) begin
+            max_value = $signed(mm2.sum_outputs[i]);
+            digit_out = i;
+        end
+    end
+end
+```
+
+---
+
+## Physical Testing Apparatus
+
+I forked [LIU-Zisen/Basys3-Camera](https://github.com/LIU-Zisen/Basys3-Camera) to interface an OV7670 camera and VGA monitor, adding a pipeline to convert 320×240 RGB → 28×28 binary for NN input. The platform is a **Nexys‐A7 100T** dev board.
+
+Realtime demo: [YouTube Video](https://www.youtube.com/watch?v=suAA6G8M_ZM)
+
+---
+
+## Timing Evaluation
+
+The exact time for a matrix multiplication is:
+
+```
+time_ns = (uniqueDimA + uniqueDimB + sharedDim + ramLatency + 1) * clockPeriod_ns
+```
+
+For a (784×1)·(110×784) fixed-32 multiply:
+
+```
+(784 + 110 + 1 + 4 + 1) * 20 ns = 18,000 ns
+```
+
+Vivado simulation waveform (pink = MM1 finished) confirms **18 µs** per inference.
+
+---
+
+## M2 CPU Comparison
+
+C++ `matrix_vector_multiply` on random int32 data averaged **579,663 ns** over 200 iterations:
+
+```cpp
+void matrix_vector_multiply(
+    const vector<vector<int32_t>>& A,
+    const vector<int32_t>& v,
+    vector<int32_t>& result
+) {
+    int rows = A.size();
+    int cols = A[0].size();
+    for (int i = 0; i < rows; ++i) {
+        result[i] = 0;
+        for (int j = 0; j < cols; ++j) {
+            result[i] += A[i][j] * v[j];
+        }
+    }
+}
+```
+
+**Speedup:** 579,663 ns / 18,000 ns ≈ **32.2×**
+
+---
+
+## Reflection
+
+This project was an amazing introduction to RTL design—the most primitive form of coding. Despite the 32× speedup, real-world NN acceleration is usually served by GPUs, multi-threaded CPUs, or dedicated silicon (e.g., Apple M2 Neural Engine). FPGAs shine in niche, power- and size-constrained edge scenarios. A future V2 could further optimize timing and resource utilization.
+
+---
+
+## Sources
+
+- Tesla FSD Chip Architecture: https://en.wikichip.org/wiki/tesla_(car_company)/fsd_chip  
+- Systolic Array Overview: https://cplu.medium.com/should-we-all-embrace-systolic-array-df3830f193dc  
+- “Systolic Arrays for Matrix Multiplication” (arXiv): https://arxiv.org/pdf/1704.04760  
+- GitHub Repo: https://github.com/sun-jay/FPGA-Hardware-NN-Accelerator  
+- Realtime Demo: https://www.youtube.com/watch?v=suAA6G8M_ZM  
