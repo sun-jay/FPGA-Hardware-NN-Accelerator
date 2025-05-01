@@ -3,6 +3,7 @@
 **Saurabh Jayaram**  
 *Follow · 7 min read · Aug 25, 2024*
 
+**At the time of this project, the best AI model was GPT-4, which was pretty bad at Verilog. I'm sure as of April 2025, reasoning models such as o4 would have make this project a lot easier.**
 **Full technical writeup:** https://medium.com/@sunny.jyrm/building-a-hardware-neural-network-accelerator-from-scratch-with-an-fpga-f2d67c163f20  
 **Camera and VGA interfaces forked from:** https://github.com/LIU-Zisen/Basys3-Camera
 
