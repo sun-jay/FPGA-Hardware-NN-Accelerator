@@ -30,13 +30,15 @@
 
 In this article, I’m going to dive into a month’s-long journey to build a neural network accelerator from scratch on an FPGA. The core of the design is a systolic array architecture, which is a popular design for accelerating matrix multiplication (more details below). Exact timing simulations in Vivado revealed that this implementation carries out the required matrix multiplication for running inference **32.2× faster** than C++ on an M2 CPU (Apple clang 14.0.3). All code is available on GitHub: [sun-jay/FPGA-Hardware-NN-Accelerator](https://github.com/sun-jay/FPGA-Hardware-NN-Accelerator).
 
+![Internal Hardware Architecture](docs/architecture.png)
+
 ---
 
 ## Core Matrix Multiplier — Systolic Array
 
 The systolic array architecture is already found in many neural network accelerators—including Google’s TPU and Tesla’s Full Self-Driving chip. It leverages the simple, repetitive nature of matrix multiplication and maximizes datapoint reuse. It can carry out an \(n \times n\) matrix multiplication in \(O(n)\) time, at the cost of \(O(n^2)\) hardware area.
 
-![Systolic Array Architecture](https://www.mdpi.com/2079-9292/9/2/338)
+![Systolic Array Architecture](docs/systolic-array.png)
 
 ### MAC Module
 
@@ -124,6 +126,8 @@ The full network chains two MM stages:
 
 No biases were used (negligible accuracy impact). The dual-MM pipeline embodies the intelligence of the network.
 
+![Network Assembly](docs/network.png)
+
 ---
 
 ## ArgMax Circuit
@@ -153,6 +157,8 @@ end
 
 I forked [LIU-Zisen/Basys3-Camera](https://github.com/LIU-Zisen/Basys3-Camera) to interface an OV7670 camera and VGA monitor, adding a pipeline to convert 320×240 RGB → 28×28 binary for NN input. The platform is a **Nexys‐A7 100T** dev board.
 
+![Physical Testing Apparatus](docs/apparatus.jpeg)
+
 Realtime demo: [YouTube Video](https://www.youtube.com/watch?v=suAA6G8M_ZM)
 
 ---
@@ -172,6 +178,8 @@ For a (784×1)·(110×784) fixed-32 multiply:
 ```
 
 Vivado simulation waveform (pink = MM1 finished) confirms **18 µs** per inference.
+
+![Simulation Waveform in Vivado](docs/waveform.png)
 
 ---
 
@@ -197,6 +205,8 @@ void matrix_vector_multiply(
 ```
 
 **Speedup:** 579,663 ns / 18,000 ns ≈ **32.2×**
+
+![Timing Comparison](docs/timing.png)
 
 ---
 
